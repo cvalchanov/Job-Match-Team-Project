@@ -1,14 +1,13 @@
-from fastapi import APIRouter, Header
-from common.auth import get_user_or_raise_401
-from common.responses import BadRequest, NotFound, Unauthorized
-from data.models import LoginData, Admin, AdminRegisterData
+from fastapi import APIRouter
+from common.responses import BadRequest
+from data.models import LoginData, AdminRegisterData, DBTable
 from services import user_service
 
 admins_router = APIRouter(prefix='/admins')
 
 @admins_router.post('/login')
 def login(data: LoginData):
-    admin = user_service.try_login(username=data.username, password=data.password, table='admins')
+    admin = user_service.try_login(username=data.username, password=data.password, table=DBTable.ADMINS)
 
     if admin:
         token = user_service.create_token(admin)

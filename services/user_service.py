@@ -1,7 +1,5 @@
-from data.database import insert_query, read_query
-from data.models import AdminRegisterData, UserType, Company, Professional, CompanyRegisterData, ProfessionalRegisterData, Admin
+from data.models import AdminRegisterData, UserType, Company, Professional, Admin, DBTable
 from mariadb import IntegrityError
-from common.responses import NotFound, Unauthorized
 from data import database
 import jwt
 from datetime import datetime, timedelta
@@ -22,9 +20,9 @@ def get_by_username(username: str, table: str, get_data_func = None) -> Company 
         f'''SELECT * FROM {table} WHERE username = ?''',
         (username,))
 
-    if table == 'companies':
+    if table == DBTable.COMPANIES:
         return next((Company.from_query_result(*row) for row in data), None)
-    elif table == 'professionals':
+    elif table == DBTable.PROFESSIONALS:
         return next((Professional.from_query_result(*row) for row in data), None)
     else:
         return next((Admin.from_query_result(*row) for row in data), None)        
@@ -36,9 +34,9 @@ def get_by_id(id: int, table: str, get_data_func = None) -> Company | Profession
     data = get_data_func(
         f'''SELECT * FROM {table} WHERE id = ?''', (id,))
 
-    if table == 'companies':
+    if table == DBTable.COMPANIES:
         return next((Company.from_query_result(*row) for row in data), None)
-    elif table == 'professionals':
+    elif table == DBTable.PROFESSIONALS:
         return next((Professional.from_query_result(*row) for row in data), None)
     else:
         return next((Admin.from_query_result(*row) for row in data), None) 
@@ -68,13 +66,13 @@ def create(registration_data: AdminRegisterData, insert_data_func = None) -> Adm
 
 def create_token(user: Company | Professional | Admin) -> str:
     datestamp = datetime.now()
-    token_expiration = datestamp + timedelta(hours=9)
-    if user is type(Company):
+    token_expiration = datestamp + timedelta(days=14)
+    if type(user) is Company:
         user_type = UserType.COMPANY
-    elif user is type(Admin):
-        user_type = UserType.PROFESSIONAL
-    else:
+    elif type(user) is Admin:
         user_type = UserType.ADMIN
+    else:
+        user_type = UserType.PROFESSIONAL
     token = jwt.encode({'exp': token_expiration, 'id': user.id, 'username': user.username, "type": user_type}, SECRET, algorithm="HS256") 
     return token
 
@@ -97,11 +95,11 @@ def is_authenticated(token: str, get_data_func = None) -> bool | None:
         user_id = user_info['id']
         user_username = user_info['username']
         user_type = user_info['type']
-        if user_type is UserType.COMPANY:
+        if user_type == UserType.COMPANY:
             return any(get_data_func(
                 '''SELECT 1 FROM companies where id = ? and username = ?''',
                 (user_id, user_username)))
-        elif user_type is UserType.PROFESSIONAL:
+        elif user_type == UserType.PROFESSIONAL:
             return any(get_data_func(
                 '''SELECT 1 FROM professionals where id = ? and username = ?''',
                 (user_id, user_username)))
@@ -118,11 +116,9 @@ def from_token(token: str) -> Company | Professional | Admin | None:
     else:
         user_username = user_info['username']
         user_type = user_info['type']
-        if user_type is UserType.COMPANY:
-            return get_by_username(username=user_username, table='companies')
-        elif user_type is UserType.PROFESSIONAL:
-            return get_by_username(username=user_username, table='professionals')
+        if user_type == UserType.COMPANY:
+            return get_by_username(username=user_username, table=DBTable.COMPANIES)
+        elif user_type == UserType.PROFESSIONAL:
+            return get_by_username(username=user_username, table=DBTable.PROFESSIONALS)
         else:
-            return get_by_username(username=user_username, table='admins')       
-
-
+            return get_by_username(username=user_username, table=DBTable.ADMINS)       
